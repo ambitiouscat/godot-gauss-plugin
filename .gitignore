@@ -1,0 +1,10 @@
+# Godot-generated project cache.
+.godot/
+
+# Generated import and UID sidecars are not part of the addon source.
+*.import
+*.uid
+
+# These two icon import descriptors are intentionally distributed upstream.
+!addons/gdgs/editor/icons/gaussian_resource.svg.import
+!addons/gdgs/editor/icons/gaussian_splat_node.svg.import

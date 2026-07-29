@@ -1,0 +1,70 @@
+@tool
+extends EditorImportPlugin
+
+const GaussianResourceBuilder = preload("res://addons/gdgs/importers/builders/gaussian_resource_builder.gd")
+const GaussianSourceDecoder = preload("res://addons/gdgs/importers/gaussian_source_decoder.gd")
+const GaussianDiagnostics = preload("res://addons/gdgs/runtime/diagnostics/gaussian_diagnostics.gd")
+
+func _get_priority() -> float:
+	return 2.0
+
+func _get_import_order() -> int:
+	return 0
+
+func _get_importer_name() -> String:
+	return "gaussian.splat.importer"
+
+func _get_format_version() -> int:
+	return 5
+
+func _get_visible_name() -> String:
+	return "Gaussian Splat (.ply/.compressed.ply/.splat/.sog)"
+
+func _get_recognized_extensions() -> PackedStringArray:
+	return ["ply", "splat", "sog"]
+
+func _get_save_extension() -> String:
+	return "res"
+
+func _get_resource_type() -> String:
+	return "Resource"
+
+func _get_preset_count() -> int:
+	return 1
+
+func _get_preset_name(preset_index: int) -> String:
+	return "Default"
+
+func _get_import_options(path: String, preset_index: int) -> Array[Dictionary]:
+	return []
+
+func _import(source_file, save_path, options, platform_variants, gen_files) -> Error:
+	print("[gdgs]: importing gaussian splat file: %s" % source_file)
+	var import_started_usec := GaussianDiagnostics.begin_import(String(source_file))
+
+	var decode_result := _decode_source(String(source_file))
+	if not decode_result.get("ok", false):
+		push_error("[gdgs]: %s" % decode_result.get("message", "Unknown import error"))
+		var decode_error := int(decode_result.get("error", ERR_CANT_OPEN))
+		GaussianDiagnostics.finish_import(import_started_usec, false, decode_error)
+		return decode_error
+
+	var build_result := GaussianResourceBuilder.build(decode_result["canonical"])
+	if not build_result.get("ok", false):
+		push_error("[gdgs]: %s" % build_result.get("message", "Unable to build gaussian resource"))
+		var build_error := int(build_result.get("error", ERR_INVALID_DATA))
+		GaussianDiagnostics.finish_import(import_started_usec, false, build_error)
+		return build_error
+
+	var filename := "%s.%s" % [save_path, _get_save_extension()]
+	var error := ResourceSaver.save(build_result["resource"], filename)
+	if error != OK:
+		push_error("[gdgs]: failed to save gaussian resource (%d)" % error)
+	else:
+		print("[gdgs]: import complete, %d gaussians ready for rendering" % int(build_result["resource"].point_count))
+
+	GaussianDiagnostics.finish_import(import_started_usec, error == OK, error)
+	return error
+
+func _decode_source(source_file: String) -> Dictionary:
+	return GaussianSourceDecoder.decode(source_file)
